@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>seed</title>
+    <!-- 引入seed -->
+    <script src="../dist/sunw-seed.js"></script>
+    <!-- 引入模块注册文件 -->
+    <script src="js/modules.js"></script>
+    <script>
+
+
+        Sunw.use("c", function(S, C) {
+            console.log(C)  //返回C模块的返回结果
+        }).ready(function(S) {
+            S.bind(S("button")[0], "click", function() {
+                alert("点击了按钮，即将加载d模块，注意div颜色变化")
+                S.use("d")
+            })
+        })
+
+
+
+    </script>
+</head>
+<body>
+
+    <div id="test" class="d">dddd</div>
+    <button>点击我改变颜色</button>
+</body>
+</html>
