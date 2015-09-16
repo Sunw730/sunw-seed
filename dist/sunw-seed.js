@@ -1,5 +1,7 @@
 /**
  * Created by [Sun Wang] on 2015/9/15.
+ * QQ:274072355
+ * Email:sunwang_730@163.com
  */
 (function (w, d, S, u) {
 
