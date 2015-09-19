@@ -129,9 +129,11 @@
                     _tmp = {},      //临时集合，用于模块去重
                     _add = function (_name) {
                         var _dependencies = S.getModuleDependencies(_name); //获取依赖
-                        if (!(_name in _tmp)) _tmp[_name] = new Module(_name);   //创建Module对象
+                        if (!(_name in _tmp)) {
+                            _tmp[_name] = S.getModule(_name, true)._module;
+                        }
                         for (var i = 0, l = _dependencies.length; i < l; i++) {
-                            _add(_dependencies[i]).addSubscribers(_tmp[_name])  //解析依赖
+                            _add(_dependencies[i])  //解析依赖
                         }
                         return _tmp[_name]
                     }
@@ -502,9 +504,9 @@
             S.Env.modules[name] = {
                 config: config,
                 dependencies: dependencies,
-                factory: factory,
-                result: u
+                factory: factory
             }
+            S.Env.modules[name]._module = new Module(name)
             //状态初始化
             S.Env.State[name] = State.UNLOAD;
             return S
@@ -517,13 +519,13 @@
          */
         use: function (names, fn) {
             var names = Methods.toArray(names),
-                _modules = Methods.getLoadingModules(names),    //依赖分析
+            //_modules = Methods.getLoadingModules(names),    //依赖分析
                 _fn = function () {
                     var _params = [S],
                         i = 0,
                         l = 0
-                    for (i = 0, l = _modules.length; i < l; i++) {
-                        if (S.getModuleState(_modules[i].name) !== State.SUCCESS) return false;
+                    for (i = 0, l = names.length; i < l; i++) {
+                        if (S.getModuleState(names[i]) !== State.SUCCESS) return false;
                     }
                     //参数初始化
                     for (i = 0, l = names.length; i < l; i++) {
@@ -531,10 +533,8 @@
                     }
                     if(S.isFunction(fn)) fn.apply(w, _params)
                 }
-            for (var i = 0, l = _modules.length; i < l; i++) {
-                if (S.getModuleDependencies(_modules[i].name).length === 0) {
-                    _modules[i].load(_fn);
-                }
+            for (var i = 0, l = names.length; i < l; i++) {
+                S.getModule(names[i])._module.load(_fn);
             }
             return S;
         }
@@ -564,11 +564,11 @@
         _init: function () {
             var _self = this,
                 _url = S.isBlank(_self.version) ? _self.url : (_self.url + (_self.url.indexOf("?") < 0 ? "?" : "&") + "v=" + _self.version),
-                //封装回调函数
+            //封装回调函数
                 _callback = function (state, S) {
                     if (S.isFunction(_self.callback)) _self.callback.call(_self, state, S)
                 },
-                //封装订阅者加载函数
+            //封装订阅者加载函数
                 _loadSubscribers = function () {
                     for (var i = 0, l = _self._subscribers.length; i < l; i++) {
                         _self._subscribers[i].load.call(_self._subscribers[i], _self.callback)
@@ -655,12 +655,11 @@
         var _self = this;
         extend(_self, S.Env.modules[name].config, {
             name: name,     //模块名称
-            callback: u,    //回调函数
+            callback: [],    //回调函数
             _result: u,     //工厂函数返回结果
             _tid: u,        //超时设置
             _success: u,
-            _error: u,
-            _subscribers: [] //订阅此模块的其他模块，Module数组
+            _error: u
         })
         _self._init();
     }
@@ -672,22 +671,7 @@
         _init: function () {
             var _self = this,
                 _name = _self.name,
-                _State = S.Env.State,
-                /**
-                 * 回调函数
-                 * @param state
-                 * @param S
-                 * @private
-                 */
-                _callback = function (state, S) {
-                    if (S.isFunction(_self.callback)) _self.callback.call(_self, state, S)
-                },
-            //封装订阅者加载函数
-                _loadSubscribers = function () {
-                    for (var i = 0, l = _self._subscribers.length; i < l; i++) {
-                        _self._subscribers[i].load.call(_self._subscribers[i], _self.callback)
-                    }
-                }
+                _State = S.Env.State
             //回调函数初始化
             extend(_self, {
                 _success: function () {
@@ -696,9 +680,7 @@
                     //改变状态
                     _State[_name] = State.SUCCESS
                     //回调
-                    _callback(true, S)
-                    //订阅者加载
-                    _loadSubscribers();
+                    _self._callback(true, S)
                 },
                 _error: function () {
                     //清除定时器
@@ -706,32 +688,40 @@
                     //改变状态
                     _State[_name] = State.ERROR
                     //回调
-                    _callback(false, S)
-                    //订阅者加载
-                    _loadSubscribers();
+                    _self._callback(false, S)
+                },
+                /**
+                 * 回调函数
+                 * @param state
+                 * @param S
+                 * @private
+                 */
+                _callback: function(state, S) {
+                    while(_self.callback.length > 0) {
+                        if(S.isFunction(_self.callback[0])) {
+                            _self.callback[0].call(_self, state, S);
+                        }
+                        _self.callback.shift()
+                    }
+                },
+                /**
+                 * 添加回调
+                 * @param _fn
+                 * @private
+                 */
+                _addCallback: function(_fn) {
+                    if(S.isFunction(_fn)) {
+                        _self.callback.push(_fn)
+                    } else if(S.isArray(_fn)) {
+                        for(var i = 0, l = _fn.length; i < l; i++) {
+                            if(S.isFunction(_fn[i])) {
+                                _self.callback.push(_fn[i])
+                            }
+                        }
+                    }
+                    return _self;
                 }
             })
-        },
-        /**
-         * 添加订阅者
-         * @param subscribers
-         * @returns {Node}
-         */
-        addSubscribers: function (subscribers) {
-            var _self = this,
-                _add = function (_subscriber) {
-                    if (_subscriber instanceof Module) {
-                        _self._subscribers.push(_subscriber)
-                    }
-                }
-            if (S.isArray(subscribers)) {
-                for (var i = 0, l = subscribers.length; i < l; i++) {
-                    _add(subscribers[i])
-                }
-            } else {
-                _add(subscribers)
-            }
-            return _self;
         },
         /**
          * 检查依赖是否加载完毕
@@ -760,39 +750,59 @@
                 _module = _Modules[_name],
                 _dependencies = _module.dependencies,
                 _factory = _module.factory
-            //回调函数设置
-            _self.callback = fn;
-            //依赖检查
-            if (!_self.canLoad()) return;
-            //如果已经加载成功这不再加载
-            if (_State[_name] === State.SUCCESS || _State[_name] === State.LOADING) return _self._success();
-            //开始加载
-            _State[_name] = State.LOADING;
-            //定时器
-            if (!isNaN(_timeout) && _timeout > 0) {
-                _self._tid = setTimeout(function () {
-                    _State[_name] = State.TIMEOUT
-                    Methods.error(Msg.ERROR_MODULE_TIMEOUT, _name)
-                }, _timeout)
+            if(_State[_name] === State.SUCCESS) {
+                //如果模块已经加载成功
+                _self._addCallback(fn);
+                return _self._callback(true, S);
+            } else if(_State[_name] === State.LOADING) {
+                //如果正在加载
+                return _self._addCallback(fn)
             }
-            if (S.isFunction(_factory)) {
-                //对于工厂函数加载
-                return _self._loadFn();
+            var _tmp = {},
+                _fn = function() {
+                    if(!_self.canLoad()) return false;
+                    //开始加载
+                    _State[_name] = State.LOADING;
+                    //定时器
+                    if (!isNaN(_timeout) && _timeout > 0) {
+                        _self._tid = setTimeout(function () {
+                            _State[_name] = State.TIMEOUT,
+                                _self.callback = [] //清除回调
+                            Methods.error(Msg.ERROR_MODULE_TIMEOUT, _name)
+                        }, _timeout)
+                    }
+                    if (S.isFunction(_factory)) {
+                        //对于工厂函数加载
+                        return _self._loadFn(fn);
+                    } else {
+                        //节点加载
+                        return _self._loadNodes(fn);
+                    }
+                }
+            if(_dependencies.length > 0) {
+                //先加载依赖
+                for(var i = 0, l = _dependencies.length; i < l; i++) {
+                    if(!(_dependencies[i] in _tmp)) {
+                        _tmp[_dependencies[i]] = true,
+                            _Modules[_dependencies[i]]._module.load(_fn)
+                    }
+                }
             } else {
-                //节点加载
-                return _self._loadNodes();
+                _fn()
             }
         },
         /**
          * 加载工厂函数
          * @private
          */
-        _loadFn: function () {
+        _loadFn: function (fn) {
             var _self = this,
                 _name = _self.name,
                 _module = S.getModule(_name, true),
                 _factory = _module.factory,
                 _dependencies = _module.dependencies
+            //设置回调函数
+            _self._addCallback(fn);
             //对于工厂函数加载
             //获取工厂函数参数
             var _params = [S]
@@ -813,7 +823,7 @@
          * 加载脚本节点
          * @private
          */
-        _loadNodes: function () {
+        _loadNodes: function (fn) {
             var _self = this,
                 _name = _self.name,
                 _Modules = S.Env.modules,
@@ -835,6 +845,8 @@
                         _self._error()
                     }
                 }
+            //设置回调函数
+            _self._addCallback(fn)
             //转成Node对象
             for (var i = 0, l = _factory.length; i < l; i++) {
                 _nodes.push(new Node(_factory[i]))

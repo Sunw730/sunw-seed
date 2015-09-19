@@ -12,6 +12,8 @@
 
         Sunw.use("c", function(S, C) {
             console.log(C)  //返回C模块的返回结果
+        }).use("c", function() {
+            console.log(11)
         }).ready(function(S) {
             S.bind(S("button")[0], "click", function() {
                 alert("点击了按钮，即将加载d模块，注意div颜色变化")
