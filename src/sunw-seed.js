@@ -16,7 +16,7 @@
         }
     };
 
-    var version = "1.1",   //版本号
+    var version = "1.1.1",   //版本号
         /**
          * 消息定义
          * @type {{*}}
@@ -565,11 +565,11 @@
             var _self = this,
                 _url = S.isBlank(_self.version) ? _self.url : (_self.url + (_self.url.indexOf("?") < 0 ? "?" : "&") + "v=" + _self.version),
                 _isCss = /\.css\??.*$/i.test(_self.url),
-                //封装回调函数
+            //封装回调函数
                 _callback = function (state, S) {
                     if (S.isFunction(_self.callback)) _self.callback.call(_self, state, S)
                 },
-                //封装订阅者加载函数
+            //封装订阅者加载函数
                 _loadSubscribers = function () {
                     for (var i = 0, l = _self._subscribers.length; i < l; i++) {
                         _self._subscribers[i].load.call(_self._subscribers[i], _self.callback)
@@ -769,22 +769,15 @@
          */
         load: function (fn) {
             var _self = this,
-                _name = _self.name,
-                _timeout = _self.timeout,
-                _State = S.Env.State,
-                _Modules = S.Env.modules,
-                _module = _Modules[_name],
-                _dependencies = _module.dependencies,
-                _factory = _module.factory
-            if(_State[_name] === State.SUCCESS) {
-                //如果模块已经加载成功
-                _self._addCallback(fn);
-                return _self._callback(true, S);
-            } else if(_State[_name] === State.LOADING) {
-                //如果正在加载
-                return _self._addCallback(fn)
-            }
-            var _tmp = {},
+                _name = _self.name,     //模块名称
+                _timeout = _self.timeout,   //模块超时设置
+                _State = S.Env.State,   //所有模块状态
+                _Modules = S.Env.modules,   //所有模块配置
+                _module = _Modules[_name],  //当前模块配置
+                _dependencies = _module.dependencies,   //当前模块依赖名称
+                _factory = _module.factory, //当前模块定义
+                _unSuccessDeps = [],    //当前模块还未加载成功的依赖（Module类型）
+                _unSuccessDepsSet = {}, //当前模块还未加载成功的依赖集合，用于去重
                 _fn = function() {
                     if(!_self.canLoad()) return false;
                     //开始加载
@@ -805,13 +798,27 @@
                         return _self._loadNodes(fn);
                     }
                 }
-            if(_dependencies.length > 0) {
-                //先加载依赖
-                for(var i = 0, l = _dependencies.length; i < l; i++) {
-                    if(!(_dependencies[i] in _tmp)) {
-                        _tmp[_dependencies[i]] = true,
-                            _Modules[_dependencies[i]]._module.load(_fn)
+            if(_State[_name] === State.SUCCESS) {
+                //如果模块已经加载成功
+                _self._addCallback(fn);
+                return _self._callback(true, S);
+            } else if(_State[_name] === State.LOADING) {
+                //如果正在加载
+                return _self._addCallback(fn)
+            }
+            //未完成依赖
+            for(var i = 0, l = _dependencies.length; i < l; i++) {
+                if(S.getModuleState(_dependencies[i]) !== State.SUCCESS) {
+                    if(!(_dependencies[i] in _unSuccessDepsSet)) {
+                        _unSuccessDepsSet[_dependencies[i]] = true;
+                        _unSuccessDeps.push(_Modules[_dependencies[i]]._module)
                     }
+                }
+            }
+            if(_unSuccessDeps.length > 0) {
+                //先加载依赖
+                for(var i = 0, l = _unSuccessDeps.length; i < l; i++) {
+                    _unSuccessDeps[i].load(_fn)
                 }
             } else {
                 _fn()

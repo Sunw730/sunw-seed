@@ -10,4 +10,4 @@ Sunw.add("a", "", function(S) {
     return a + b.b;
 }).add("e", ["a"], function(S, a) {
     return a + 3;
-}).add({name:"d", base:"../demo"}, "a, b", "css/d.css, js/d.js")
+}).add({name:"d", base:"../demo"}, "a, b, c", "css/d.css, js/d.js, js/dd.js")

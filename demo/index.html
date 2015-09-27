@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>seed</title>
     <!-- 引入seed -->
-    <!--<script src="../dest/sunw-seed_1.1.0.min.js"></script>-->
     <script src="../src/sunw-seed.js"></script>
     <!-- 引入模块注册文件 -->
     <script src="js/modules.js"></script>
@@ -17,7 +16,9 @@
         }).ready(function(S) {
             S.bind(S("button")[0], "click", function() {
                 console.log("点击了按钮，即将加载d模块，注意div颜色变化")
-                S.use("d")
+                S.use("d", function() {
+                    console.log("d complete")
+                })
             })
         })
 
