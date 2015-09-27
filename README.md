@@ -27,9 +27,11 @@
 脚本仅包含一个JS文件，并且没有任何依赖
 ```
 sunw-seed/
-└── dist/
-    ├── sunw-seed_{version}.js
+└── dest/
     └── sunw-seed_{version}.min.js
+└── src/
+    ├── sunw-seed.js
+    └── sunw-seed_{version}.js
 ```
 
 # 使用说明
