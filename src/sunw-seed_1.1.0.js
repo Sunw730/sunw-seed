@@ -564,11 +564,12 @@
         _init: function () {
             var _self = this,
                 _url = S.isBlank(_self.version) ? _self.url : (_self.url + (_self.url.indexOf("?") < 0 ? "?" : "&") + "v=" + _self.version),
-            //封装回调函数
+                _isCss = /\.css\??.*$/i.test(_self.url),
+                //封装回调函数
                 _callback = function (state, S) {
                     if (S.isFunction(_self.callback)) _self.callback.call(_self, state, S)
                 },
-            //封装订阅者加载函数
+                //封装订阅者加载函数
                 _loadSubscribers = function () {
                     for (var i = 0, l = _self._subscribers.length; i < l; i++) {
                         _self._subscribers[i].load.call(_self._subscribers[i], _self.callback)
@@ -590,8 +591,15 @@
                     //订阅者加载
                     _loadSubscribers();
                 }
+            extend(true, _self, {
+                _url: _url,
+                _callback: _callback,
+                _success: _success,
+                _error: _error,
+                _isCss: _isCss
+            })
             //初始化dom
-            if (/\.css\??.*$/i.test(_self.url)) {
+            if (_self._isCss) {
                 _self._dom = d.createElement("link"),
                     extend(_self._dom, {
                         rel: "stylesheet",
@@ -633,12 +641,30 @@
             return _self;
         },
         /**
+         * 判断当前节点是否已经加载
+         */
+        canLoad: function() {
+            var _self = this,
+                _tagName = _self._isCss ? "link" : "script",
+                _attr = _self._isCss ? "href" : "src",
+                _nodes = d.getElementsByTagName(_tagName);
+            if(_nodes && _nodes.length > 0) {
+                for(var i = 0, l = _nodes.length; i < l; i++) {
+                    if(_self._url == _nodes[i][_attr]) return false;
+                }
+            }
+            return true;
+        },
+        /**
          * 开始加载
          * @returns {*}
          */
         load: function (fn) {
             var _self = this
             if (!_self._dom) return Methods.error(Msg.ERROR_NODE_NOT_INIT, _self.url)
+            if(_self.canLoad() === false) {
+                return _self._success
+            }
             //开始加载
             _self.state = State.LOADING,
                 _self.callback = fn,
